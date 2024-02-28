@@ -14,14 +14,18 @@ def scan_ports(ip, start_port, end_port):
     for port in range(start_port, end_port + 1):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(1)  # Set a timeout for the connection attempt
-        result = s.connect_ex((ip, port))
-
-        if result == 0:
-            open_ports.append(port)
-        else:
-            closed_ports.append(port)
-
-        s.close()
+        try:
+            result = s.connect_ex((ip, port))
+            if result == 0:
+                open_ports.append(port)
+            else:
+                closed_ports.append(port)
+        except socket.error:
+            # Handle socket errors (e.g., invalid IP address)
+            messagebox.showerror("Error", "Failed to connect to the target.")
+            return [], []
+        finally:
+            s.close()
 
     return open_ports, closed_ports
 
@@ -44,14 +48,28 @@ class PortScannerTests(unittest.TestCase):
 
 def on_scan_button_click():
     ip = ip_entry.get()
-    start_port = int(start_port_entry.get())
-    end_port = int(end_port_entry.get())
+    start_port_str = start_port_entry.get()
+    end_port_str = end_port_entry.get()
+
+    try:
+        start_port = int(start_port_str)
+        end_port = int(end_port_str)
+        if start_port < 0 or start_port > 65535 or end_port < 0 or end_port > 65535:
+            raise ValueError("Port number out of range")
+        if end_port < start_port:
+            raise ValueError("End port cannot be less than the start port")
+    except ValueError as e:
+        messagebox.showerror("Error", f"Invalid input: {e}")
+        return
 
     try:
         open_ports, closed_ports = scan_ports(ip, start_port, end_port)
         display_scan_results(open_ports, closed_ports)
     except ValueError:
-        messagebox.showerror("Error", "Invalid input. Please enter a valid IP address and port range.")
+        messagebox.showerror("Error", "Invalid input. Please enter a valid IP address.")
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred during scanning: {e}")
+
 
 def display_scan_results(open_ports, closed_ports):
     result_text.config(state=tk.NORMAL)
